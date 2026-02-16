@@ -20,12 +20,10 @@ final class SettingsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
         $this->publishes([
             __DIR__.'/../config/settings.php' => $this->app->configPath('settings.php'),
         ], 'settings-config');
-
-        $this->publishes([
-            __DIR__.'/../database/migrations/2026_02_15_000000_create_settings_table.php' => $this->app->databasePath('migrations/2026_02_15_000000_create_settings_table.php'),
-        ], 'settings-migrations');
     }
 }
