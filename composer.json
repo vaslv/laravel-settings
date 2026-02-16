@@ -1,0 +1,36 @@
+{
+    "name": "vaslv/laravel-settings",
+    "description": "Reusable Laravel settings package with typed values and caching.",
+    "type": "library",
+    "license": "MIT",
+    "version": "1.0.0",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0",
+        "illuminate/database": "^10.0|^11.0",
+        "illuminate/cache": "^10.0|^11.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.27"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vaslv\\LaravelSettings\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vaslv\\LaravelSettings\\SettingsServiceProvider"
+            ],
+            "aliases": {
+                "Settings": "Vaslv\\LaravelSettings\\Facades\\Settings"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
