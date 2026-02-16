@@ -7,6 +7,7 @@ namespace Vaslv\LaravelSettings;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Support\Arr;
 use Vaslv\LaravelSettings\Models\Setting;
 
@@ -18,11 +19,18 @@ final class SettingsManager
 
     private SettingCaster $caster;
 
-    public function __construct(CacheManager $cache, ConfigRepository $config, SettingCaster $caster)
-    {
+    private Encrypter $encrypter;
+
+    public function __construct(
+        CacheManager $cache,
+        ConfigRepository $config,
+        SettingCaster $caster,
+        Encrypter $encrypter
+    ) {
         $this->cache = $cache->store();
         $this->config = $config;
         $this->caster = $caster;
+        $this->encrypter = $encrypter;
     }
 
     public function get(string $key, mixed $default = null): mixed
@@ -33,7 +41,7 @@ final class SettingsManager
             return $default;
         }
 
-        return $this->castToPhp($settings[$key]['type'], $settings[$key]['value']);
+        return $this->getCastValue($settings[$key]['type'], $settings[$key]['value']);
     }
 
     public function set(string $key, mixed $value): void
@@ -43,7 +51,7 @@ final class SettingsManager
         $type = $setting?->type ?? $this->inferType($value);
         $group = $setting?->group ?? $this->inferGroup($key);
 
-        $rawValue = $this->castToRaw($type, $value);
+        $rawValue = $this->setCastValue($type, $value);
 
         Setting::query()->updateOrCreate(
             ['key' => $key],
@@ -62,7 +70,7 @@ final class SettingsManager
         $setting = Setting::query()->where('key', $key)->first();
         $group = $setting?->group ?? $this->inferGroup($key);
 
-        $rawValue = $this->castToRaw($type, $value);
+        $rawValue = $this->setCastValue($type, $value);
 
         Setting::query()->updateOrCreate(
             ['key' => $key],
@@ -163,29 +171,54 @@ final class SettingsManager
         return Arr::first($segments) ?? 'default';
     }
 
-    private function castToPhp(string $type, ?string $value): mixed
+    private function getCastValue(string $type, ?string $value): mixed
     {
+        $rawValue = $this->decryptIfNeeded($value);
+
         if (! $this->caster->has($type)) {
-            return $value;
+            return $rawValue;
         }
 
-        return $this->caster->resolve($type)->get($value);
+        return $this->caster->resolve($type)->get($rawValue);
     }
 
-    private function castToRaw(string $type, mixed $value): string
+    private function setCastValue(string $type, mixed $value): ?string
     {
         if (! $this->caster->has($type)) {
-            return $value === null ? '' : (string) $value;
+            return $this->encryptIfNeeded($value === null ? null : (string) $value);
         }
 
-        return $this->caster->resolve($type)->set($value);
+        return $this->encryptIfNeeded($this->caster->resolve($type)->set($value));
     }
 
     /** @param array<string, array{group: string, type: string, value: string|null}> $settings */
     private function castMany(array $settings): array
     {
         return array_map(function ($item) {
-            return $this->castToPhp($item['type'], $item['value']);
+            return $this->getCastValue($item['type'], $item['value']);
         }, $settings);
+    }
+
+    private function encryptIfNeeded(?string $value): ?string
+    {
+        if ($value === null || $value === '' || ! $this->isEncryptionEnabled()) {
+            return $value;
+        }
+
+        return $this->encrypter->encrypt($value, false);
+    }
+
+    private function decryptIfNeeded(?string $value): ?string
+    {
+        if ($value === null || $value === '' || ! $this->isEncryptionEnabled()) {
+            return $value;
+        }
+
+        return (string) $this->encrypter->decrypt($value, false);
+    }
+
+    private function isEncryptionEnabled(): bool
+    {
+        return (bool) $this->config->get('settings.encryption.enabled', false);
     }
 }

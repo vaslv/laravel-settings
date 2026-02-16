@@ -33,6 +33,9 @@ php artisan migrate
 ```php
 return [
     'table' => 'settings',
+    'encryption' => [
+        'enabled' => false,
+    ],
     'cache' => [
         'enabled' => true,
         'ttl' => 3600,
@@ -76,6 +79,18 @@ Types are stored explicitly in the DB and cast on read.
 ## Cache
 
 The package caches all settings under one key and clears it automatically on `set` or `setWithType`.
+
+## Encryption
+
+Enable encryption to store raw values in encrypted form in the database. Values are decrypted on read.
+
+```php
+return [
+    'encryption' => [
+        'enabled' => true,
+    ],
+];
+```
 
 ## Code Style
 
