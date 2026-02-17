@@ -55,7 +55,7 @@ use Settings;
 
 Settings::get('site.legal_text');
 Settings::set('site.enabled', true);
-Settings::setWithType('site.legal_text', '# Legal', 'markdown');
+Settings::set('site.legal_text', '# Legal', 'markdown');
 ```
 
 ### Helper
@@ -63,6 +63,7 @@ Settings::setWithType('site.legal_text', '# Legal', 'markdown');
 ```php
 setting('site.legal_text');
 setting('site.enabled', false);
+setting('site.legal_text', '# Legal', 'markdown');
 ```
 
 ## Supported Types
@@ -78,7 +79,7 @@ Types are stored explicitly in the DB and cast on read.
 
 ## Cache
 
-The package caches all settings under one key and clears it automatically on `set` or `setWithType`.
+The package caches all settings under one key and clears it automatically on `set`.
 
 ## Encryption
 

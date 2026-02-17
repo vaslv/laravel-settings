@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\App;
 use Vaslv\LaravelSettings\SettingsManager;
 
 if (! function_exists('setting')) {
-    function setting(string $key, mixed $value = null): mixed
+    function setting(string $key, mixed $value = null, ?string $type = null): mixed
     {
         /** @var SettingsManager $manager */
         $manager = App::make(SettingsManager::class);
@@ -15,7 +15,7 @@ if (! function_exists('setting')) {
             return $manager->get($key);
         }
 
-        $manager->set($key, $value);
+        $manager->set($key, $value, $type);
 
         return $value;
     }

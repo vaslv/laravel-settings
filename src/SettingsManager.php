@@ -44,30 +44,11 @@ final class SettingsManager
         return $this->getCastValue($settings[$key]['type'], $settings[$key]['value']);
     }
 
-    public function set(string $key, mixed $value): void
+    public function set(string $key, mixed $value, ?string $type = null): void
     {
         $setting = Setting::query()->where('key', $key)->first();
 
-        $type = $setting?->type ?? $this->inferType($value);
-        $group = $setting?->group ?? $this->inferGroup($key);
-
-        $rawValue = $this->setCastValue($type, $value);
-
-        Setting::query()->updateOrCreate(
-            ['key' => $key],
-            [
-                'group' => $group,
-                'type' => $type,
-                'value' => $rawValue,
-            ]
-        );
-
-        $this->clearCache();
-    }
-
-    public function setWithType(string $key, mixed $value, string $type): void
-    {
-        $setting = Setting::query()->where('key', $key)->first();
+        $type = $type ?? $setting?->type ?? $this->inferType($value);
         $group = $setting?->group ?? $this->inferGroup($key);
 
         $rawValue = $this->setCastValue($type, $value);
