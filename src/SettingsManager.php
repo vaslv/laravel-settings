@@ -87,6 +87,15 @@ final class SettingsManager
         return $this->castMany($this->allRaw());
     }
 
+    /** @return array<int, string> */
+    public function groups(): array
+    {
+        $settings = $this->allRaw();
+        $groups = array_map(fn (array $item): ?string => $item['group'], $settings);
+
+        return array_values(array_filter(array_unique($groups)));
+    }
+
     public function clearCache(): void
     {
         if (! $this->isCacheEnabled()) {
