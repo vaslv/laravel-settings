@@ -6,16 +6,20 @@ use Illuminate\Support\Facades\App;
 use Vaslv\LaravelSettings\SettingsManager;
 
 if (! function_exists('setting')) {
-    function setting(string $key, mixed $value = null, ?string $type = null): mixed
+    function setting(?string $key = null, mixed $value = null, ?string $type = null): mixed
     {
         /** @var SettingsManager $manager */
         $manager = App::make(SettingsManager::class);
+
+        if (func_num_args() === 0) {
+            return $manager;
+        }
 
         if (func_num_args() === 1) {
             return $manager->get($key);
         }
 
-        $manager->set($key, $value, $type);
+        $manager->set((string) $key, $value, $type);
 
         return $value;
     }

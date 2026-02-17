@@ -65,6 +65,7 @@ Settings::set('legal_text', '# Legal'); // group = null
 setting('site.legal_text');
 setting('site.enabled', false);
 setting('site.legal_text', '# Legal', 'markdown');
+setting()->groups();
 ```
 
 ## Supported Types

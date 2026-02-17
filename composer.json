@@ -3,7 +3,7 @@
     "description": "Reusable Laravel settings package with typed values and caching.",
     "type": "library",
     "license": "MIT",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "require": {
         "php": "^8.2",
         "illuminate/support": "^10.0|^11.0|^12.0",
