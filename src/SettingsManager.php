@@ -61,8 +61,6 @@ final class SettingsManager
                 'value' => $rawValue,
             ]
         );
-
-        $this->clearCache();
     }
 
     public function has(string $key): bool

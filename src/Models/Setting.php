@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
 use Vaslv\LaravelSettings\SettingCaster;
+use Vaslv\LaravelSettings\SettingsManager;
 
 /**
  * @property int $id
@@ -44,5 +45,18 @@ final class Setting extends Model
         }
 
         return $caster->resolve($this->type)->get($this->attributes['value']);
+    }
+
+    protected static function booted(): void
+    {
+        self::saved(fn () => self::clearSettingsCache());
+        self::deleted(fn () => self::clearSettingsCache());
+    }
+
+    private static function clearSettingsCache(): void
+    {
+        /** @var SettingsManager $manager */
+        $manager = App::make(SettingsManager::class);
+        $manager->clearCache();
     }
 }
