@@ -74,6 +74,7 @@ setting()->groups();
 - boolean
 - integer
 - float
+- html
 - json
 - markdown
 

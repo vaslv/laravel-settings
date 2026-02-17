@@ -8,6 +8,7 @@ enum SettingType: string
 {
     case BOOLEAN = 'boolean';
     case FLOAT = 'float';
+    case HTML = 'html';
     case INTEGER = 'integer';
     case JSON = 'json';
     case MARKDOWN = 'markdown';

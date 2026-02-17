@@ -9,6 +9,7 @@ use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 use Vaslv\LaravelSettings\Casts\BooleanCast;
 use Vaslv\LaravelSettings\Casts\FloatCast;
+use Vaslv\LaravelSettings\Casts\HtmlCast;
 use Vaslv\LaravelSettings\Casts\IntegerCast;
 use Vaslv\LaravelSettings\Casts\JsonCast;
 use Vaslv\LaravelSettings\Casts\MarkdownCast;
@@ -25,6 +26,7 @@ final class SettingCaster
         SettingType::BOOLEAN->value => BooleanCast::class,
         SettingType::INTEGER->value => IntegerCast::class,
         SettingType::FLOAT->value => FloatCast::class,
+        SettingType::HTML->value => HtmlCast::class,
         SettingType::JSON->value => JsonCast::class,
         SettingType::MARKDOWN->value => MarkdownCast::class,
     ];
