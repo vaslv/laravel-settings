@@ -96,7 +96,7 @@ final class SettingsManager
         $this->cache->forget($this->cacheKey());
     }
 
-    /** @return array<string, array{group: string, type: string, value: string|null}> */
+    /** @return array<string, array{group: string|null, type: string, value: string|null}> */
     private function allRaw(): array
     {
         if (! $this->isCacheEnabled()) {
@@ -110,7 +110,7 @@ final class SettingsManager
         });
     }
 
-    /** @return array<string, array{group: string, type: string, value: string|null}> */
+    /** @return array<string, array{group: string|null, type: string, value: string|null}> */
     private function loadAllRaw(): array
     {
         return Setting::query()
@@ -145,11 +145,15 @@ final class SettingsManager
         };
     }
 
-    private function inferGroup(string $key): string
+    private function inferGroup(string $key): ?string
     {
+        if (! str_contains($key, '.')) {
+            return null;
+        }
+
         $segments = explode('.', $key);
 
-        return Arr::first($segments) ?? 'default';
+        return Arr::first($segments);
     }
 
     private function getCastValue(string $type, ?string $value): mixed
@@ -172,7 +176,7 @@ final class SettingsManager
         return $this->encryptIfNeeded($this->caster->resolve($type)->set($value));
     }
 
-    /** @param array<string, array{group: string, type: string, value: string|null}> $settings */
+    /** @param array<string, array{group: string|null, type: string, value: string|null}> $settings */
     private function castMany(array $settings): array
     {
         return array_map(function ($item) {

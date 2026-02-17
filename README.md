@@ -56,6 +56,7 @@ use Settings;
 Settings::get('site.legal_text');
 Settings::set('site.enabled', true);
 Settings::set('site.legal_text', '# Legal', 'markdown');
+Settings::set('legal_text', '# Legal'); // group = null
 ```
 
 ### Helper

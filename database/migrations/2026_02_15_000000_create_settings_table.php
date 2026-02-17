@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create($this->tableName(), function (Blueprint $table): void {
             $table->bigIncrements('id');
             $table->string('key')->unique();
-            $table->string('group')->index();
+            $table->string('group')->nullable()->index();
             $table->string('type');
             $table->text('value')->nullable();
             $table->timestamps();
