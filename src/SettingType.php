@@ -6,10 +6,10 @@ namespace Vaslv\LaravelSettings;
 
 enum SettingType: string
 {
-    case STRING = 'string';
     case BOOLEAN = 'boolean';
-    case INTEGER = 'integer';
     case FLOAT = 'float';
+    case INTEGER = 'integer';
     case JSON = 'json';
     case MARKDOWN = 'markdown';
+    case STRING = 'string';
 }

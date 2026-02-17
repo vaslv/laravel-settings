@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    public function down(): void
+    {
+        Schema::dropIfExists($this->tableName());
+    }
+
     public function up(): void
     {
         Schema::create($this->tableName(), function (Blueprint $table): void {
@@ -19,11 +24,6 @@ return new class extends Migration
             $table->text('value')->nullable();
             $table->timestamps();
         });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists($this->tableName());
     }
 
     private function tableName(): string

@@ -17,6 +17,8 @@ use Vaslv\LaravelSettings\Casts\StringCast;
 
 final class SettingCaster
 {
+    private Container $container;
+
     /** @var array<string, class-string<SettingCast>> */
     private array $map = [
         SettingType::STRING->value => StringCast::class,
@@ -27,8 +29,6 @@ final class SettingCaster
         SettingType::MARKDOWN->value => MarkdownCast::class,
     ];
 
-    private Container $container;
-
     /** @param array<string, class-string<SettingCast>> $map */
     public function __construct(Container $container, array $map = [])
     {
@@ -37,6 +37,11 @@ final class SettingCaster
         if ($map !== []) {
             $this->map = $map + $this->map;
         }
+    }
+
+    public function has(string $type): bool
+    {
+        return isset($this->map[$type]);
     }
 
     /**
@@ -49,10 +54,5 @@ final class SettingCaster
         }
 
         return $this->container->make($this->map[$type]);
-    }
-
-    public function has(string $type): bool
-    {
-        return isset($this->map[$type]);
     }
 }
