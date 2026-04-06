@@ -5,7 +5,9 @@ Reusable Laravel package for storing typed settings in the database with caching
 ## Requirements
 
 - PHP 8.2+
-- Laravel 10+
+- Laravel 10-13
+
+Laravel 13 requires PHP 8.3+ because the underlying `illuminate/*` 13.x components require it.
 
 ## Installation
 
@@ -99,3 +101,12 @@ return [
 ## Code Style
 
 Code is formatted to comply with Laravel Pint.
+
+## Compatibility
+
+The package is tested against these combinations:
+
+- Laravel 10 on PHP 8.2
+- Laravel 11 on PHP 8.2
+- Laravel 12 on PHP 8.2
+- Laravel 13 on PHP 8.3
