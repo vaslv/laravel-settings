@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vaslv\LaravelSettings\Tests;
 
 use Vaslv\LaravelSettings\Facades\Settings;
+use Vaslv\LaravelSettings\Models\Setting;
 use Vaslv\LaravelSettings\SettingsManager;
 
 final class SettingsManagerTest extends TestCase
@@ -35,5 +36,17 @@ final class SettingsManagerTest extends TestCase
             'site.enabled' => true,
             'site.title' => 'Laravel Settings',
         ], Settings::group('site'));
+    }
+
+    public function test_setting_model_get_value_decrypts_when_encryption_is_enabled(): void
+    {
+        $this->app['config']->set('settings.encryption.enabled', true);
+
+        Settings::set('secret.token', 'top-secret', 'string');
+
+        $setting = Setting::query()->where('key', 'secret.token')->firstOrFail();
+
+        $this->assertNotSame('top-secret', $setting->getRawOriginal('value'));
+        $this->assertSame('top-secret', $setting->getValue());
     }
 }

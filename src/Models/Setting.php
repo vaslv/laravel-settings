@@ -8,7 +8,6 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
-use Vaslv\LaravelSettings\SettingCaster;
 use Vaslv\LaravelSettings\SettingsManager;
 
 /**
@@ -37,14 +36,10 @@ final class Setting extends Model
      */
     public function getValue(): mixed
     {
-        /** @var SettingCaster $caster */
-        $caster = App::make(SettingCaster::class);
+        /** @var SettingsManager $manager */
+        $manager = App::make(SettingsManager::class);
 
-        if (! $caster->has($this->type)) {
-            return $this->value;
-        }
-
-        return $caster->resolve($this->type)->get($this->attributes['value']);
+        return $manager->castValue($this->type, $this->attributes['value'] ?? null);
     }
 
     protected static function booted(): void

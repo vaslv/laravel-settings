@@ -39,6 +39,11 @@ final class SettingsManager
         return $this->castMany($this->allRaw());
     }
 
+    public function castValue(string $type, ?string $value): mixed
+    {
+        return $this->getCastValue($type, $value);
+    }
+
     public function clearCache(): void
     {
         if (! $this->isCacheEnabled()) {
@@ -119,7 +124,7 @@ final class SettingsManager
 
     private function cacheKey(): string
     {
-        return (string) $this->config->get('settings.cache.key', 'app_settings');
+        return (string) $this->config->get('settings.cache.key', 'settings');
     }
 
     /** @param array<string, array{group: string|null, type: string, value: string|null}> $settings */

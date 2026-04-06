@@ -41,7 +41,7 @@ return [
     'cache' => [
         'enabled' => true,
         'ttl' => 3600,
-        'key' => 'app_settings',
+        'key' => 'settings',
     ],
 ];
 ```

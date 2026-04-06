@@ -31,20 +31,26 @@ final class SettingsServiceProvider extends ServiceProvider
         $this->app->alias(SettingsManager::class, 'settings.manager');
     }
 
-    private function migrationPath(string $sourcePath): string
+    private function migrationPathWithTimestamp(string $sourcePath, int $timestamp): string
     {
         $fileName = preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', basename($sourcePath));
 
-        return $this->app->databasePath('migrations/'.date('Y_m_d_His').'_'.(string) $fileName);
+        return $this->app->databasePath('migrations/'.date('Y_m_d_His', $timestamp).'_'.$fileName);
     }
 
     /** @param array<int, string> $migrationPaths */
     private function migrationPublishes(array $migrationPaths): array
     {
+        sort($migrationPaths, SORT_STRING);
+
+        $baseTimestamp = time();
         $publishes = [];
 
-        foreach ($migrationPaths as $migrationPath) {
-            $publishes[$migrationPath] = $this->migrationPath($migrationPath);
+        foreach ($migrationPaths as $index => $migrationPath) {
+            $publishes[$migrationPath] = $this->migrationPathWithTimestamp(
+                $migrationPath,
+                $baseTimestamp + $index
+            );
         }
 
         return $publishes;
