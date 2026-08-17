@@ -15,11 +15,15 @@ if (! function_exists('setting')) {
             return $manager;
         }
 
+        if ($key === null) {
+            throw new InvalidArgumentException('setting() requires a key when called with arguments.');
+        }
+
         if (func_num_args() === 1) {
             return $manager->get($key);
         }
 
-        $manager->set((string) $key, $value, $type);
+        $manager->set($key, $value, $type);
 
         return $value;
     }

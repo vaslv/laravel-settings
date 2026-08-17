@@ -39,17 +39,16 @@ final class SettingsManager
         return $this->castMany($this->allRaw());
     }
 
-    public function castValue(string $type, ?string $value): mixed
+    public function castValue(string $type, ?string $value, bool $encrypted = false): mixed
     {
-        return $this->getCastValue($type, $value);
+        return $this->getCastValue($type, $value, $encrypted);
     }
 
     public function clearCache(): void
     {
-        if (! $this->isCacheEnabled()) {
-            return;
-        }
-
+        // Deliberately not guarded by settings.cache.enabled: a write that happens
+        // while caching is off must still evict whatever an earlier enabled run
+        // left behind, otherwise re-enabling the cache resurrects a stale snapshot.
         $this->cache->forget($this->cacheKey());
     }
 
@@ -61,7 +60,11 @@ final class SettingsManager
             return $default;
         }
 
-        return $this->getCastValue($settings[$key]['type'], $settings[$key]['value']);
+        return $this->getCastValue(
+            $settings[$key]['type'],
+            $settings[$key]['value'],
+            $settings[$key]['encrypted']
+        );
     }
 
     /** @return array<string, mixed> */
@@ -78,8 +81,9 @@ final class SettingsManager
     {
         $settings = $this->allRaw();
         $groups = array_map(fn (array $item): ?string => $item['group'], $settings);
+        $named = array_filter($groups, fn (?string $group): bool => $group !== null && $group !== '');
 
-        return array_values(array_filter(array_unique($groups)));
+        return array_values(array_unique($named));
     }
 
     public function has(string $key): bool
@@ -96,19 +100,21 @@ final class SettingsManager
         $type = $type ?? $setting?->type ?? $this->inferType($value);
         $group = $setting?->group ?? $this->inferGroup($key);
 
-        $rawValue = $this->setCastValue($type, $value);
+        $plainValue = $this->toRawValue($type, $value);
+        $encrypted = $this->shouldEncrypt($plainValue);
 
         Setting::query()->updateOrCreate(
             ['key' => $key],
             [
                 'group' => $group,
                 'type' => $type,
-                'value' => $rawValue,
+                'encrypted' => $encrypted,
+                'value' => $encrypted ? $this->encrypter->encrypt($plainValue, false) : $plainValue,
             ]
         );
     }
 
-    /** @return array<string, array{group: string|null, type: string, value: string|null}> */
+    /** @return array<string, array{group: string|null, type: string, encrypted: bool, value: string|null}> */
     private function allRaw(): array
     {
         if (! $this->isCacheEnabled()) {
@@ -127,35 +133,31 @@ final class SettingsManager
         return (string) $this->config->get('settings.cache.key', 'settings');
     }
 
-    /** @param array<string, array{group: string|null, type: string, value: string|null}> $settings */
+    /** @param array<string, array{group: string|null, type: string, encrypted: bool, value: string|null}> $settings */
     private function castMany(array $settings): array
     {
-        return array_map(function ($item) {
-            return $this->getCastValue($item['type'], $item['value']);
+        return array_map(function (array $item): mixed {
+            return $this->getCastValue($item['type'], $item['value'], $item['encrypted']);
         }, $settings);
     }
 
-    private function decryptIfNeeded(?string $value): ?string
+    /**
+     * Decryption is driven by the per-row marker, never by the current config flag.
+     * Toggling settings.encryption.enabled therefore only changes how NEW writes are
+     * stored; rows already on disk keep being read the way they were written.
+     */
+    private function decryptIfNeeded(?string $value, bool $encrypted): ?string
     {
-        if ($value === null || $value === '' || ! $this->isEncryptionEnabled()) {
+        if (! $encrypted || $value === null || $value === '') {
             return $value;
         }
 
         return (string) $this->encrypter->decrypt($value, false);
     }
 
-    private function encryptIfNeeded(?string $value): ?string
+    private function getCastValue(string $type, ?string $value, bool $encrypted): mixed
     {
-        if ($value === null || $value === '' || ! $this->isEncryptionEnabled()) {
-            return $value;
-        }
-
-        return $this->encrypter->encrypt($value, false);
-    }
-
-    private function getCastValue(string $type, ?string $value): mixed
-    {
-        $rawValue = $this->decryptIfNeeded($value);
+        $rawValue = $this->decryptIfNeeded($value, $encrypted);
 
         if (! $this->caster->has($type)) {
             return $rawValue;
@@ -196,26 +198,32 @@ final class SettingsManager
         return (bool) $this->config->get('settings.encryption.enabled', false);
     }
 
-    /** @return array<string, array{group: string|null, type: string, value: string|null}> */
+    /** @return array<string, array{group: string|null, type: string, encrypted: bool, value: string|null}> */
     private function loadAllRaw(): array
     {
         return Setting::query()
-            ->get(['key', 'group', 'type', 'value'])
+            ->get(['key', 'group', 'type', 'encrypted', 'value'])
             ->keyBy('key')
             ->map(fn (Setting $setting): array => [
                 'group' => $setting->group,
                 'type' => $setting->type,
+                'encrypted' => (bool) $setting->encrypted,
                 'value' => $setting->value,
             ])
             ->all();
     }
 
-    private function setCastValue(string $type, mixed $value): ?string
+    private function shouldEncrypt(?string $plainValue): bool
+    {
+        return $this->isEncryptionEnabled() && $plainValue !== null && $plainValue !== '';
+    }
+
+    private function toRawValue(string $type, mixed $value): ?string
     {
         if (! $this->caster->has($type)) {
-            return $this->encryptIfNeeded($value === null ? null : (string) $value);
+            return $value === null ? null : (string) $value;
         }
 
-        return $this->encryptIfNeeded($this->caster->resolve($type)->set($value));
+        return $this->caster->resolve($type)->set($value);
     }
 }

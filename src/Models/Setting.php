@@ -13,16 +13,24 @@ use Vaslv\LaravelSettings\SettingsManager;
 /**
  * @property int $id
  * @property string $key
- * @property string $group
+ * @property string|null $group
  * @property string $type
- * @property mixed $value
+ * @property bool $encrypted
+ * @property string|null $value
  */
 final class Setting extends Model
 {
+    // Property form, not the casts() method: the method was added in Laravel 11 and
+    // this package still supports Laravel 10.
+    protected $casts = [
+        'encrypted' => 'boolean',
+    ];
+
     protected $fillable = [
         'key',
         'group',
         'type',
+        'encrypted',
         'value',
     ];
 
@@ -39,7 +47,11 @@ final class Setting extends Model
         /** @var SettingsManager $manager */
         $manager = App::make(SettingsManager::class);
 
-        return $manager->castValue($this->type, $this->attributes['value'] ?? null);
+        return $manager->castValue(
+            $this->type,
+            $this->attributes['value'] ?? null,
+            (bool) ($this->attributes['encrypted'] ?? false)
+        );
     }
 
     protected static function booted(): void

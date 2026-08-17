@@ -13,7 +13,13 @@ final class JsonCast extends AbstractCast
      */
     public function get(mixed $value): mixed
     {
-        return $value ? json_decode((string) $value, true, flags: JSON_THROW_ON_ERROR) : [];
+        // Explicit null/empty check, not truthiness: the encoded JSON scalar "0" is a
+        // falsy string, so a truthiness test decodes the stored value 0 as [].
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        return json_decode((string) $value, true, flags: JSON_THROW_ON_ERROR);
     }
 
     /**
