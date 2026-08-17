@@ -9,6 +9,7 @@ use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Support\Arr;
+use InvalidArgumentException;
 use Vaslv\LaravelSettings\Models\Setting;
 
 final class SettingsManager
@@ -37,6 +38,21 @@ final class SettingsManager
     public function all(): array
     {
         return $this->castMany($this->allRaw());
+    }
+
+    /**
+     * The key is scoped by connection, database and table. A flat key is shared by
+     * every tenant in an application that swaps connections, or swaps the database
+     * behind one connection, while pointing at a single cache store: whoever primes
+     * it first serves their settings to everyone else.
+     */
+    public function cacheKey(): string
+    {
+        $base = (string) $this->config->get('settings.cache.key', 'settings');
+        $connection = (string) $this->config->get('database.default', 'default');
+        $table = (string) $this->config->get('settings.table', 'settings');
+
+        return implode(':', [$base, $connection, $this->databaseName($connection), $table]);
     }
 
     public function castValue(string $type, ?string $value, bool $encrypted = false): mixed
@@ -128,17 +144,19 @@ final class SettingsManager
         });
     }
 
-    private function cacheKey(): string
-    {
-        return (string) $this->config->get('settings.cache.key', 'settings');
-    }
-
     /** @param array<string, array{group: string|null, type: string, encrypted: bool, value: string|null}> $settings */
     private function castMany(array $settings): array
     {
         return array_map(function (array $item): mixed {
             return $this->getCastValue($item['type'], $item['value'], $item['encrypted']);
         }, $settings);
+    }
+
+    private function databaseName(string $connection): string
+    {
+        $database = (string) $this->config->get("database.connections.{$connection}.database", '');
+
+        return (string) preg_replace('/[^A-Za-z0-9_.-]+/', '_', basename($database));
     }
 
     /**
@@ -158,6 +176,13 @@ final class SettingsManager
     private function getCastValue(string $type, ?string $value, bool $encrypted): mixed
     {
         $rawValue = $this->decryptIfNeeded($value, $encrypted);
+
+        // A NULL column means "no value", whatever the declared type says. Handing it
+        // to a cast would turn it into '' for strings, false for booleans and 0 for
+        // numbers, so null could never survive a round trip.
+        if ($rawValue === null) {
+            return null;
+        }
 
         if (! $this->caster->has($type)) {
             return $rawValue;
@@ -218,10 +243,15 @@ final class SettingsManager
         return $this->isEncryptionEnabled() && $plainValue !== null && $plainValue !== '';
     }
 
+    /**
+     * Unknown types are rejected here rather than quietly stringified. A typo in a
+     * type name used to turn a bool or an array into a lossy string with no signal.
+     * Reads stay permissive so rows already carrying an unknown type remain readable.
+     */
     private function toRawValue(string $type, mixed $value): ?string
     {
         if (! $this->caster->has($type)) {
-            return $value === null ? null : (string) $value;
+            throw new InvalidArgumentException("Unknown setting type: {$type}");
         }
 
         return $this->caster->resolve($type)->set($value);

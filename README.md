@@ -91,21 +91,53 @@ Types are stored explicitly in the DB and cast on read.
 render anything; the type is a label telling your application how to treat the value.
 Escaping stored HTML remains the caller's job at render time.
 
-An unrecognised type is not an error. The value is returned as the stored string, so a
-typo in a type name degrades quietly rather than throwing.
+Writing an unregistered type throws `InvalidArgumentException`, so a typo fails where
+you made it. Reading stays permissive: a row whose type is not registered comes back
+as the stored string, which keeps existing data readable.
+
+`null` round-trips for every type. Writing null stores a SQL `NULL` and reading it
+returns null rather than `''`, `false`, or `0`. The one exception is `json`, where null
+is a value in its own right and is stored as the string `null`.
+
+`boolean` reads and writes agree on what counts as true: `true`, `1`, `"1"`, `"true"`,
+`"on"`, `"yes"`. Everything else is false, including the string `"false"`. Register a
+custom cast if you need different rules.
+
+`float` keeps full precision. Values are stored in the shortest form that casts back to
+the identical float, so nothing is truncated to 14 significant digits. `NAN` and `INF`
+are rejected, since neither has a string form that survives the round trip.
+
+### Custom types
+
+Bind your own `SettingCaster` with an extra map. Entries override the built-ins on
+collision, and anything you do not list stays available.
+
+```php
+$this->app->singleton(SettingCaster::class, fn ($app) => new SettingCaster(
+    $app,
+    ['duration' => DurationCast::class],
+));
+```
+
+A cast implements `get(mixed $value): mixed` and `set(mixed $value): ?string`.
 
 ## Cache
 
 The package caches all settings under one key and clears it automatically on `set`, and
 on any `Setting` model save or delete.
 
+Eviction is deferred to the outermost commit when the write happens inside a
+transaction, so a concurrent reader cannot cache state that is not committed yet. A
+rolled back write leaves the cache untouched.
+
 Writes that bypass Eloquent events do not clear it. Query-builder `update`/`delete`,
 `upsert`, raw SQL, and direct database edits leave the snapshot stale for up to the TTL.
 Call `Settings::clearCache()` after those, or set `cache.enabled` to `false`.
 
-The cache key is a single flat string. In a multi-tenant application that swaps database
-connections while sharing one cache store, give each tenant its own `cache.key`,
-otherwise one tenant's snapshot can be served to another.
+`cache.key` is a prefix, not the whole key. The connection name, database name and
+table are appended, so a multi-tenant application that swaps connections, or swaps the
+database behind one connection, gets a separate entry per tenant instead of serving one
+tenant's settings to another. `Settings::cacheKey()` returns the key actually in use.
 
 ## Encryption
 

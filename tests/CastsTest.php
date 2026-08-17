@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vaslv\LaravelSettings\Tests;
 
+use InvalidArgumentException;
 use JsonException;
 use Vaslv\LaravelSettings\Facades\Settings;
 use Vaslv\LaravelSettings\Models\Setting;
@@ -19,6 +20,50 @@ final class CastsTest extends TestCase
         $this->assertFalse(Settings::get('flag.off'));
         $this->assertSame('1', Setting::query()->where('key', 'flag.on')->value('value'));
         $this->assertSame('0', Setting::query()->where('key', 'flag.off')->value('value'));
+    }
+
+    public function test_boolean_writes_agree_with_boolean_reads(): void
+    {
+        foreach (['false', 'off', 'no', '0', 0, false] as $falsy) {
+            Settings::set('flag.value', $falsy, 'boolean');
+            $this->assertFalse(Settings::get('flag.value'), var_export($falsy, true).' should store as false');
+        }
+
+        foreach (['true', 'on', 'yes', '1', 1, true] as $truthy) {
+            Settings::set('flag.value', $truthy, 'boolean');
+            $this->assertTrue(Settings::get('flag.value'), var_export($truthy, true).' should store as true');
+        }
+    }
+
+    public function test_every_type_round_trips_null(): void
+    {
+        foreach (['string', 'boolean', 'integer', 'float', 'html', 'markdown'] as $type) {
+            Settings::set("nullable.{$type}", null, $type);
+
+            $this->assertNull(Settings::get("nullable.{$type}"), "{$type} should round-trip null");
+            $this->assertNull(Setting::query()->where('key', "nullable.{$type}")->value('value'));
+        }
+    }
+
+    public function test_float_keeps_full_precision_through_a_round_trip(): void
+    {
+        $precise = 1.23456789012345678;
+
+        Settings::set('num.precise', $precise, 'float');
+        Settings::set('num.big', 1.0e25, 'float');
+
+        // A (string) cast honours `precision` (14 digits) and used to truncate this
+        // to 1.2345678901235 on the way into the database.
+        $this->assertSame($precise, Settings::get('num.precise'));
+        $this->assertSame(1.0e25, Settings::get('num.big'));
+    }
+
+    public function test_float_rejects_values_with_no_round_trippable_form(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('finite number');
+
+        Settings::set('num.broken', INF, 'float');
     }
 
     public function test_float_round_trips(): void
@@ -55,6 +100,16 @@ final class CastsTest extends TestCase
         $this->assertSame(5, Settings::get('num.retries'));
         $this->assertSame(0, Settings::get('num.none'));
         $this->assertSame(-3, Settings::get('num.below'));
+    }
+
+    public function test_json_keeps_null_distinct_from_an_absent_value(): void
+    {
+        Settings::set('cfg.jsonNull', null, 'json');
+
+        // In JSON, null is a value. It is encoded as "null" rather than left as a SQL
+        // NULL, so it stays distinguishable from a column that was never written.
+        $this->assertSame('null', Setting::query()->where('key', 'cfg.jsonNull')->value('value'));
+        $this->assertNull(Settings::get('cfg.jsonNull'));
     }
 
     public function test_json_round_trips_nested_structures(): void

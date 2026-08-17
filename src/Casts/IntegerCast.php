@@ -11,8 +11,8 @@ final class IntegerCast extends AbstractCast
         return (int) $value;
     }
 
-    public function set(mixed $value): string
+    public function set(mixed $value): ?string
     {
-        return (string) ((int) $value);
+        return $value === null ? null : (string) ((int) $value);
     }
 }

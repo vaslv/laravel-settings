@@ -8,6 +8,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
+use RuntimeException;
 use Vaslv\LaravelSettings\SettingsManager;
 
 /**
@@ -54,16 +55,25 @@ final class Setting extends Model
         );
     }
 
-    protected static function booted(): void
-    {
-        self::saved(fn () => self::clearSettingsCache());
-        self::deleted(fn () => self::clearSettingsCache());
-    }
-
-    private static function clearSettingsCache(): void
+    private function clearSettingsCache(): void
     {
         /** @var SettingsManager $manager */
         $manager = App::make(SettingsManager::class);
-        $manager->clearCache();
+
+        // Inside a transaction the write is not visible to other connections yet, so
+        // evicting the key now lets a concurrent reader repopulate it with pre-commit
+        // state that then survives the whole TTL. afterCommit() defers until the
+        // outermost commit, and runs immediately when there is no transaction.
+        try {
+            $this->getConnection()->afterCommit(fn () => $manager->clearCache());
+        } catch (RuntimeException) {
+            $manager->clearCache();
+        }
+    }
+
+    protected static function booted(): void
+    {
+        self::saved(fn (self $setting) => $setting->clearSettingsCache());
+        self::deleted(fn (self $setting) => $setting->clearSettingsCache());
     }
 }

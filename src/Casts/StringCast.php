@@ -11,8 +11,8 @@ class StringCast extends AbstractCast
         return $this->normalizeNull($value);
     }
 
-    public function set(mixed $value): string
+    public function set(mixed $value): ?string
     {
-        return $this->normalizeNull($value) ?? '';
+        return $this->normalizeNull($value);
     }
 }

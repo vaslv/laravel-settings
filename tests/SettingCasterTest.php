@@ -61,9 +61,31 @@ final class SettingCasterTest extends TestCase
             'value' => 'raw-payload',
         ]);
 
-        // has() is checked before resolve(), so an unrecognised type degrades to the
-        // stored string rather than throwing. A typo in a type name is therefore silent.
+        // Writes reject unknown types, but reads stay permissive so a row written
+        // before that rule, or by something outside this package, is still readable.
         $this->assertSame('raw-payload', Settings::get('weird.one'));
+    }
+
+    public function test_writing_a_registered_custom_type_is_accepted(): void
+    {
+        $this->app->singleton(SettingCaster::class, fn ($app): SettingCaster => new SettingCaster(
+            $app,
+            ['reversed' => ReversedCast::class]
+        ));
+
+        Settings::set('custom.word', 'stressed', 'reversed');
+
+        $this->assertSame('desserts', Setting::query()->where('key', 'custom.word')->value('value'));
+        $this->assertSame('stressed', Settings::get('custom.word'));
+    }
+
+    public function test_writing_an_unknown_type_is_rejected(): void
+    {
+        // A typo used to be stored happily and turned the value into a lossy string.
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown setting type: boolena');
+
+        Settings::set('flag.typo', true, 'boolena');
     }
 }
 

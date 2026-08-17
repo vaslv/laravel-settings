@@ -23,9 +23,12 @@ final class JsonCast extends AbstractCast
     }
 
     /**
+     * Null is encoded rather than passed through: in JSON it is a value in its own
+     * right, so "null" round-trips back to null and stays distinct from a SQL NULL.
+     *
      * @throws JsonException
      */
-    public function set(mixed $value): string
+    public function set(mixed $value): ?string
     {
         return json_encode($value, JSON_THROW_ON_ERROR);
     }
