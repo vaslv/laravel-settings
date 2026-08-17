@@ -22,6 +22,8 @@ final class SettingsManager
 
     private Encrypter $encrypter;
 
+    private ?bool $tracksEncryptionPerRow = null;
+
     public function __construct(
         CacheManager $cache,
         ConfigRepository $config,
@@ -66,6 +68,11 @@ final class SettingsManager
         // while caching is off must still evict whatever an earlier enabled run
         // left behind, otherwise re-enabling the cache resurrects a stale snapshot.
         $this->cache->forget($this->cacheKey());
+
+        // The manager is a singleton, so the schema probe is memoised for the life of
+        // the request. Drop it here too, otherwise a migration that runs in the same
+        // process keeps being invisible.
+        $this->tracksEncryptionPerRow = null;
     }
 
     public function get(string $key, mixed $default = null): mixed
@@ -119,15 +126,38 @@ final class SettingsManager
         $plainValue = $this->toRawValue($type, $value);
         $encrypted = $this->shouldEncrypt($plainValue);
 
-        Setting::query()->updateOrCreate(
-            ['key' => $key],
-            [
-                'group' => $group,
-                'type' => $type,
-                'encrypted' => $encrypted,
-                'value' => $encrypted ? $this->encrypter->encrypt($plainValue, false) : $plainValue,
-            ]
-        );
+        $attributes = [
+            'group' => $group,
+            'type' => $type,
+            'value' => $encrypted ? $this->encrypter->encrypt($plainValue, false) : $plainValue,
+        ];
+
+        // Skip the marker on an installation that has not run the migration yet, so
+        // upgrading without migrating keeps working instead of hitting an unknown
+        // column. Such an installation stays on the old global-flag behaviour.
+        if ($this->tracksEncryptionPerRow()) {
+            $attributes['encrypted'] = $encrypted;
+        }
+
+        Setting::query()->updateOrCreate(['key' => $key], $attributes);
+    }
+
+    /**
+     * Whether the table carries the per-row encryption marker. False on an install
+     * that has upgraded the package but not yet run the migration; every encryption
+     * decision then falls back to the global config flag, as it did before.
+     */
+    public function tracksEncryptionPerRow(): bool
+    {
+        if ($this->tracksEncryptionPerRow !== null) {
+            return $this->tracksEncryptionPerRow;
+        }
+
+        $model = new Setting;
+
+        return $this->tracksEncryptionPerRow = $model->getConnection()
+            ->getSchemaBuilder()
+            ->hasColumn($model->getTable(), 'encrypted');
     }
 
     /** @return array<string, array{group: string|null, type: string, encrypted: bool, value: string|null}> */
@@ -226,13 +256,23 @@ final class SettingsManager
     /** @return array<string, array{group: string|null, type: string, encrypted: bool, value: string|null}> */
     private function loadAllRaw(): array
     {
+        $perRow = $this->tracksEncryptionPerRow();
+
+        $columns = $perRow
+            ? ['key', 'group', 'type', 'encrypted', 'value']
+            : ['key', 'group', 'type', 'value'];
+
         return Setting::query()
-            ->get(['key', 'group', 'type', 'encrypted', 'value'])
+            ->get($columns)
             ->keyBy('key')
             ->map(fn (Setting $setting): array => [
                 'group' => $setting->group,
                 'type' => $setting->type,
-                'encrypted' => (bool) $setting->encrypted,
+                // Without the marker column the global switch is the only signal there
+                // is, which is exactly how this installation behaves before upgrading.
+                'encrypted' => $perRow
+                    ? (bool) $setting->encrypted
+                    : $this->isEncryptionEnabled(),
                 'value' => $setting->value,
             ])
             ->all();

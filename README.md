@@ -33,6 +33,29 @@ If you publish the migrations, the bundled ones stop loading and your copies bec
 the only source. Publish only when you intend to edit them; otherwise both copies
 would try to create the same table and `migrate` would fail.
 
+## Upgrading to 1.2
+
+Run `php artisan migrate`. It adds an `encrypted` column that records, per row,
+whether that value is encrypted, which is what makes the encryption setting safe to
+toggle. If encryption is currently enabled, the migration marks existing rows as
+encrypted so they keep reading correctly.
+
+Forgetting the migration is not fatal. Without the column the package falls back to
+the pre-1.2 behaviour, where encryption is decided globally by the config flag.
+
+Three things change for new writes only. Values already in the database read exactly as
+before.
+
+- `boolean` writes now use the same rules as reads, so `"false"`, `"off"` and `"no"`
+  store as false instead of true.
+- `null` writes store a SQL `NULL` and read back as null instead of `''`, `false` or `0`.
+- Writing a type that has no registered cast throws instead of storing the value as a
+  string.
+
+`cache.key` became a prefix rather than the whole key, so the first read after
+upgrading repopulates the cache. If you evict the key by hand, use
+`Settings::cacheKey()`.
+
 ## Configuration
 
 `config/settings.php`
@@ -151,9 +174,9 @@ return [
 ];
 ```
 
-Each row records whether its own value is encrypted, in the `encrypted` column. Reads
-follow that marker, never the current config flag, so the setting is safe to turn on
-or off at any point:
+Each row records whether its own value is encrypted, in the `encrypted` column added in
+1.2. Reads follow that marker, never the current config flag, so the setting is safe to
+turn on or off at any point:
 
 - Turning it **on** leaves existing plaintext rows readable. They stay plaintext until
   the next write, which stores them encrypted.
@@ -167,6 +190,10 @@ no secret and only wastes storage.
 Encryption uses the application key. Rotating `APP_KEY` without re-encrypting will make
 reads of encrypted rows throw, which is deliberate: failing loudly beats handing the
 application a decrypted-looking value it cannot trust.
+
+On a table without the marker column, the package falls back to deciding encryption
+globally from the config flag. `Settings::tracksEncryptionPerRow()` reports which mode
+is active.
 
 ## Code Style
 

@@ -48,11 +48,13 @@ final class Setting extends Model
         /** @var SettingsManager $manager */
         $manager = App::make(SettingsManager::class);
 
-        return $manager->castValue(
-            $this->type,
-            $this->attributes['value'] ?? null,
-            (bool) ($this->attributes['encrypted'] ?? false)
-        );
+        // On a table without the marker column, fall back to the global flag the way
+        // the package behaved before per-row tracking existed.
+        $encrypted = array_key_exists('encrypted', $this->attributes)
+            ? (bool) $this->attributes['encrypted']
+            : (bool) Config::get('settings.encryption.enabled', false);
+
+        return $manager->castValue($this->type, $this->attributes['value'] ?? null, $encrypted);
     }
 
     private function clearSettingsCache(): void
